@@ -1,0 +1,13 @@
+name: MagicCards
+title: MagicCards
+username:
+account: rockfordmankini
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3725540
+bundleId: 4299762
+url: https://rockfordmankini.shinyapps.io/MagicCards/
+when: 1614855285.92784
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: test.html|test.json
