@@ -59,10 +59,22 @@ col_selected <- c("Color", "MC", "CMC", "Power", "Toughness",
 ### COLUMNS FOR GRAPH DROPDOWN
 var_col <- c("Color", "Power", "Toughness", "CMC", "Type", "Rarity")
 
+copyButtonJS <- "
+shinyjs.copyDL = function(toCopy) {
+                    var range = document.createRange();
+                    let el = document.getElementById(toCopy);
+                    range.selectNode(el);
+                    window.getSelection().removeAllRanges(); // clear current selection
+                    window.getSelection().addRange(range); // to select text
+                    document.execCommand('copy');
+                    window.getSelection().removeAllRanges();// to deselect
+                }"
+
 # UI
 ui <- fluidPage(
     
     useShinyjs(),
+    extendShinyjs(text = copyButtonJS, functions=c("copyDL")),
     
     # set navbar
     navbarPage("Magic Cards",
@@ -78,7 +90,9 @@ ui <- fluidPage(
                         All cards and images belong to Wizards of the Coast. I am not affiliated with any group 
                         representing MTG.", 
                                     br(), br(),
-                                    "To build a decklist, click the row of the card you want to add.",
+                                    "To build a decklist, click the row of the card you want to add. Then copy the input below and paste it into the box in the Decklist tab.",
+                                    br(),
+                                    h5("Note: pressing any of the filter buttons will reset the decklist text below. You can filter with the table, but make sure to do all sidebar filtering before selecting cards."),
                                     # columns the user can filter by, default determined by col_selected global var
                                     checkboxGroupInput("checkGroup", label=h4("Columns"),
                                                        choices=col_list, selected = col_selected, inline=TRUE),
@@ -93,7 +107,9 @@ ui <- fluidPage(
                                     checkboxGroupInput("noDuplicateSearch", label=span("No Duplicates"),
                                                        choices="On"),
                                     # reset filters and table
-                                    actionButton("reset", "Reset Filter"))
+                                    actionButton("reset", "Reset Filter"),
+                                    htmlOutput("deckListText"),
+                                    actionButton("copyDL", "Copy Decklist to Clipboard"))
                             ),
                             
                             # shows the cards
@@ -105,7 +121,14 @@ ui <- fluidPage(
                
                # deck builder
                tabPanel("Deck List",
-                        DT::dataTableOutput("deckList")
+                        sidebarLayout(
+                            sidebarPanel(
+                                textAreaInput("deckListText", height='300px', label=h3("Put Decklist Here"))
+                            ),
+                            mainPanel(
+                                DT::dataTableOutput("deckList")
+                            )
+                        )
                ),
                
                # informational graphs
@@ -144,16 +167,11 @@ server <- function(input, output, session) {
     data <- reactive({
         
         toReturn <- t
+        toReturn <- cbind(toReturn, ID=(1:nrow(toReturn)))
         
         if(!is.null(input$noDuplicateSearch)) {
             toReturn <- toReturn %>% distinct(Name_raw, .keep_all = TRUE)
         }
-        
-        toReturn
-    })
-    
-    # printing the full set of cards
-    output$preview <- DT::renderDataTable({
         
         # if the exclusive search filter is on with colors selected,
         # only choose cards that have ALL listed colors
@@ -171,35 +189,86 @@ server <- function(input, output, session) {
             regex <- paste(regex, ".*$", sep="")
             
             # use regex to filter out cards
-            return(data() %>% filter(str_detect(Color, regex) & !str_detect(Color, paste(anti_colors, collapse="|"))) %>%
-                       select(Name, Card, input$checkGroup))
+            toReturn <- toReturn %>% filter(str_detect(Color, regex) & !str_detect(Color, paste(anti_colors, collapse="|"))) %>%
+                       select(Name, Card, input$checkGroup, ID)
         }
         
         # if exclusive filter isn't checked, return all cards that have any of the colors listed
         else if(!is.null(input$checkColor)) {
-            return(data() %>% filter(str_detect(Color, paste(input$checkColor, collapse="|"))) %>%
-                       select(Name, Card, input$checkGroup))
+            toReturn <- toReturn %>% filter(str_detect(Color, paste(input$checkColor, collapse="|"))) %>%
+                       select(Name, Card, input$checkGroup, ID)
         }
         
         # if no filter active, return all.
         else {
-            return(data() %>% select(Name, Card, input$checkGroup))
+            toReturn <-  toReturn %>% select(Name, Card, input$checkGroup, ID)
         }
+        
+        toReturn
+    })
+    
+    # printing the full set of cards
+    output$preview <- DT::renderDataTable({
+        
+        data();
     }, escape=FALSE)
+    
+    output$deckListText <- renderUI ({ 
+        
+        dl_t <- "<br><div style = 'border: 1px solid #929292; border-radius: 5px; background-color: #eaeaea; padding-left: 20px; padding-right: 20px;' id=decklist_sidebar><span style='font-size: 19px; font-weight: 700; text-decoration: underline;'>Deck List</span><br><div id=toCopy>"
+        
+        if(is.null(input$preview_rows_selected)) {
+            return(HTML(paste(dl_t), "</div></div><br>"))
+        }
+        
+        rows <- input$preview_rows_selected
+        print(rows)
+        
+        
+        for(i in 1:length(rows)) {
+            real_ind <- data()[rows[i],]$ID
+            dl_t <- paste(dl_t, "1x ", t[real_ind,]$Name_raw, " {", t[real_ind,]$Id, "}",  "<br>", sep="")
+        }
+        
+        dl_t <- paste(dl_t, "</div></div><br>")
+        
+        HTML(dl_t)
+        
+        })
+
+    onclick("copyDL", {
+        js$copyDL('toCopy')
+    })
     
     deckList <- reactive({
         
-        req(input$preview_rows_selected)
-
-        t %>% slice(input$preview_rows_selected)
+        req(input$deckListText)
+        
+        cardList <- input$deckListText
+        cardList <- str_split(cardList, "\n")
+        print(cardList)
+        ids <- str_extract_all(cardList[[1]], "\\{[\\w\\d\\-]*\\}") %>% str_sub(2, -2)
+        quant <- str_extract_all(cardList[[1]], "\\dx\\s") %>% str_sub(end = -3) %>% as.numeric()
+        
+        deckListDF_orig <- t %>% filter(Id %in% ids)
+        deckListDF_new <- deckListDF_orig
+        
+        for(i in 1:nrow(deckListDF_orig)) {
+            rows <- deckListDF_orig %>% filter(Id == ids[i]) %>% slice(rep(1:n(), each=quant[i]-1))
+            print(rows)
+            
+            if(nrow(rows) > 0) {
+                deckListDF_new <- rbind(deckListDF_new, rows)
+            }
+        }
+        deckListDF_new %>% arrange(Name)
     })
     
     output$deckList <- DT::renderDataTable({
+ 
+        print(colnames(deckList()))
+        deckList() %>% select(Name, Color, Power, Toughness, MC, CMC, Type, Set_Name, Date_Released, Rarity)
         
-        input <- paste0("<input id='a", 1:nrow(deckList()), "' class='shiny-bound-input' type='number' max = '4' min = '1' value ='1' style='width: 50px;'>")
-        
-        
-        cbind(Quantity=input, deckList()) %>% select(Quantity, Name)
     }, escape=FALSE)
     
     observeEvent(input$reset, {
