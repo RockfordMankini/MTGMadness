@@ -123,6 +123,7 @@ ui <- fluidPage(
                tabPanel("Deck List",
                         sidebarLayout(
                             sidebarPanel(
+                                span("The decklist needs to follow the format of: (Quantity)x Card Name {MTGJson ID}, where (Quantity) is a number between 1 and 4 without the parentheses."),
                                 textAreaInput("deckListText", height='300px', label=h3("Put Decklist Here"))
                             ),
                             mainPanel(

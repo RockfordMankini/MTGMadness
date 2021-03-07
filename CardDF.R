@@ -1,5 +1,6 @@
 library(rjson)
 library(lubridate)
+setwd("D:/Projects/R/Magic Cards/MagicCards/MTGMadness")
 
 cardsFromJson <- function(filename) {
   df2 <- fromJSON(file = filename)
@@ -117,8 +118,8 @@ cardsFromJson <- function(filename) {
 #f[[2]][[1]]$cards[[1]]$identifiers$multiverseId
 
 # AS OF 3-2-2021, there should be 56,946 cards. Write down if you notice anything different.
-
-cards <- cardsFromJson("test.json")
+download.file("https://mtgjson.com/api/v5/AllPrintings.json","test_2.json")
+cards <- cardsFromJson("test_2.json")
 
 #df2 <- fromJSON(file = "Prices.json")
 #View(df2)
@@ -136,7 +137,7 @@ cards <- cardsFromJson("test.json")
 #    }
     
 #    else {
-      meanprice <- append(meanprice, 0)
+      #meanprice <- append(meanprice, 0)
 #    }
     
  # }
@@ -145,6 +146,8 @@ cards <- cardsFromJson("test.json")
 
 
 
-write.csv(cards, "MagicCards/cards.csv", row.names = FALSE, fileEncoding="UTF-8")
+write.csv(cards, "cards.csv", row.names = FALSE, fileEncoding="UTF-8")
 #cards[[3]]$colorIdentity
-
+library(rsconnect)
+rsconnect::deployApp(getwd(), launch.browser = F, forceUpdate = T)
+getwd()

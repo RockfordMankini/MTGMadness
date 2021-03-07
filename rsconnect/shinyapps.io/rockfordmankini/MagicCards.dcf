@@ -5,9 +5,6 @@ account: rockfordmankini
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 3725540
-bundleId: 4303005
+bundleId: 4311271
 url: https://rockfordmankini.shinyapps.io/MagicCards/
-when: 1614914480.59477
-asMultiple: FALSE
-asStatic: FALSE
-ignoredFiles: All.json|CardDF.R|LICENSE|README.md
+when: 1615098445.77066
